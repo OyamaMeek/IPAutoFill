@@ -47,7 +47,7 @@
 
     <section class="panel" aria-labelledby="form-title">
       <h2 id="form-title" class="hidden">生成节点</h2>
-      <form id="generator-form">
+      <form id="generator-form" action="/api/generate" method="post">
         <label for="nodeLink">原始 VMess 节点</label>
         <textarea id="nodeLink" name="nodeLink" spellcheck="false" placeholder="vmess://..." required></textarea>
         <div class="grid">
@@ -73,6 +73,6 @@
       <div id="nodeResults"></div>
     </section>
   </main>
-  <script src="/app.js" defer></script>
+  <script src="/frontend.js" defer></script>
 </body>
 </html>

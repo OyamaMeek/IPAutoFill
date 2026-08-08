@@ -142,8 +142,8 @@ function createServer(options = {}) {
         sendFile(response, 'index.html', 'text/html; charset=utf-8');
         return;
       }
-      if (request.method === 'GET' && request.url === '/app.js') {
-        sendFile(response, 'app.js', 'application/javascript; charset=utf-8');
+      if (request.method === 'GET' && request.url === '/frontend.js') {
+        sendFile(response, 'frontend.js', 'application/javascript; charset=utf-8');
         return;
       }
       if (request.url === '/api/generate') {

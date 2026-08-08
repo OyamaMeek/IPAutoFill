@@ -16,14 +16,14 @@ fillDemoBtn.addEventListener('click', () => {
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  hideWarning();
-  resultSection.classList.add('hidden');
-  nodeResults.replaceChildren();
-
-  submitBtn.disabled = true;
-  submitBtn.textContent = '生成中…';
 
   try {
+    hideWarning();
+    resultSection.classList.add('hidden');
+    clearNodeResults();
+    submitBtn.disabled = true;
+    submitBtn.textContent = '生成中…';
+
     const response = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -73,7 +73,12 @@ function renderNodes(nodes) {
     card.append(header, link, copy);
     fragment.append(card);
   });
-  nodeResults.replaceChildren(fragment);
+  clearNodeResults();
+  nodeResults.appendChild(fragment);
+}
+
+function clearNodeResults() {
+  nodeResults.textContent = '';
 }
 
 async function copyLink(input, button) {
