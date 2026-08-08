@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IPAutoFill · 优选 IP 节点生成</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, "PingFang SC", "Microsoft YaHei", sans-serif; color: #192236; background: #f3f7fc; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 10% 0%, #dbeafe, transparent 28rem), #f3f7fc; }
+    main { width: min(920px, calc(100% - 32px)); margin: 56px auto; }
+    .hero { margin-bottom: 24px; }
+    h1 { margin: 0 0 10px; font-size: clamp(28px, 5vw, 44px); letter-spacing: -.04em; }
+    .hero p { margin: 0; color: #536078; line-height: 1.65; }
+    .panel { padding: 26px; background: #fff; border: 1px solid #dce5f0; border-radius: 18px; box-shadow: 0 16px 42px rgb(43 69 107 / 9%); }
+    label { display: block; margin: 0 0 8px; font-size: 14px; font-weight: 700; }
+    textarea, select, input { width: 100%; border: 1px solid #c9d5e5; border-radius: 10px; background: #fff; color: #192236; font: inherit; }
+    textarea { min-height: 150px; padding: 12px; resize: vertical; line-height: 1.5; }
+    select, input { padding: 11px 12px; }
+    .grid { display: grid; grid-template-columns: 1fr 190px; gap: 16px; margin-top: 16px; align-items: end; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+    button { border: 0; border-radius: 10px; padding: 11px 16px; cursor: pointer; font: inherit; font-weight: 700; background: #e8eef7; color: #21304a; }
+    button.primary { background: #2457d6; color: white; }
+    button:hover { filter: brightness(.97); }
+    button:disabled { opacity: .65; cursor: wait; }
+    .hidden { display: none !important; }
+    #warningBox { margin-top: 18px; padding: 12px 14px; border: 1px solid #fecaca; border-radius: 10px; background: #fff1f2; color: #9f1239; white-space: pre-wrap; }
+    #resultSection { margin-top: 24px; }
+    #resultSection h2 { margin: 0 0 8px; font-size: 21px; }
+    .hint { margin: 0 0 16px; color: #61708a; font-size: 14px; }
+    #nodeResults { display: grid; gap: 12px; }
+    .node-card { padding: 16px; border: 1px solid #dce5f0; border-radius: 14px; background: #fbfdff; }
+    .node-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .node-name { font-weight: 800; color: #173d9b; }
+    .server { color: #536078; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .node-card textarea { min-height: 82px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; background: white; }
+    .copy { margin-top: 10px; }
+    @media (max-width: 620px) { main { margin: 28px auto; } .panel { padding: 18px; } .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <h1>优选 IP 自动填充</h1>
+      <p>粘贴一条 VMess 节点，选择线路后生成三个仅替换连接地址的节点副本。</p>
+    </header>
+
+    <section class="panel" aria-labelledby="form-title">
+      <h2 id="form-title" class="hidden">生成节点</h2>
+      <form id="generator-form">
+        <label for="nodeLink">原始 VMess 节点</label>
+        <textarea id="nodeLink" name="nodeLink" spellcheck="false" placeholder="vmess://..." required></textarea>
+        <div class="grid">
+          <div>
+            <label for="profile">地区 / 运营商</label>
+            <select id="profile" name="profile">
+              <option value="HZCT">HZCT</option>
+              <option value="HZCM">HZCM</option>
+            </select>
+          </div>
+          <button type="button" id="fillDemoBtn">填入示例</button>
+        </div>
+        <div class="actions">
+          <button class="primary" id="submitBtn" type="submit">生成三个节点</button>
+        </div>
+      </form>
+      <div id="warningBox" class="hidden" role="alert"></div>
+    </section>
+
+    <section id="resultSection" class="panel hidden" aria-live="polite">
+      <h2>生成结果</h2>
+      <p class="hint">每条节点的名称已设为 -1、-2、-3，可分别复制。</p>
+      <div id="nodeResults"></div>
+    </section>
+  </main>
+  <script src="/app.js" defer></script>
+</body>
+</html>

@@ -16,49 +16,53 @@ IPAutoFill 是一个优选 IP 代理节点生成工具，前端使用纯静态 H
 
 ## 当前仓库状态
 
-仓库目前尚不完整，现有文件包括：
+仓库目前包含：
 
-- `app.js`：处理浏览器端表单、发送 `POST /api/generate` 请求、渲染结果以及实现复制和二维码操作。
-- `ip.json`：
-
-当前没有 HTML 入口页、后端实现、`config.json`、`package.json`、README、测试套件、代码检查配置或依赖锁文件。需求指定的配置来源是 `config.json`，不得擅自使用空的 `ip.json` 代替。
+- `app.js`：处理浏览器端表单、调用 `POST /api/generate`、渲染三条节点链接以及复制操作。
+- `index.html`：纯静态页面入口，提供单节点输入、`HZCT`/`HZCM` 选择器和三条可复制结果。
+- `server.js`：基于 Node.js 标准库的 HTTP 服务、`config.json` 校验、VMess 解析/序列化和三节点生成。
+- `config.json`：只由服务端读取的线路 IP 配置。
+- `test/server.test.js`：使用 `node:test` 验证转换和配置错误路径。
+- `ip.json`：旧配置文件；当前业务逻辑不读取它。
 
 ## 命令
 
-当前没有定义构建、代码检查、测试、单文件测试或应用启动命令。不得假设存在 npm 命令。添加项目工具后，应根据实际的 `package.json` 或其他配置在此记录对应命令，其中必须包括运行单个测试文件的命令。
+项目使用 Node.js 标准库，无需安装第三方依赖。要求 Node.js 18 或更高版本。
 
-## 架构与迁移目标
+```bash
+npm start
+npm test
+node --test test/server.test.js
+```
 
-`app.js` 只是现有的浏览器端控制器，不负责解析或修改节点。它目前依赖固定的 DOM 元素 ID，向 `/api/generate` 提交请求，渲染订阅地址和预览表格，通过 `escapeHtml()` 转义预览数据，并提供复制和二维码交互。
+`npm start` 启动 `server.js`，默认监听 `http://localhost:3000`；可通过 `PORT=3001 npm start` 指定端口。`npm test` 运行全部测试，`node --test test/server.test.js` 运行单个测试文件。当前没有单独的构建或代码检查命令。
 
-当前请求体为：
+## 当前架构
+
+`index.html` 和 `app.js` 构成无框架的静态前端。页面仅接受一条 VMess 链接和 `HZCT`/`HZCM` 选择器，向 `POST /api/generate` 发送：
 
 ```json
 {
-  "nodeLinks": "...",
-  "preferredIps": "...",
-  "namePrefix": "...",
-  "keepOriginalHost": true
+  "nodeLink": "vmess://...",
+  "profile": "HZCT"
 }
 ```
 
-这是不符合目标产品流程的旧接口。应将自由填写的优选 IP 和名称前缀输入框替换为 `HZCT`/`HZCM` 选择器，并将请求改为发送一个原始节点和所选配置键。静态 HTML、`app.js` 和 `/api/generate` 的响应协议必须同步更新，使最终结果成为三个可直接复制的节点链接，而不是当前的 auto、raw、Clash 和 Surge 订阅地址集合。
+`app.js` 使用 DOM API 与 `textContent` 渲染后端返回的三条可复制链接，不再依赖二维码或旧订阅地址接口。
 
-后端应分离以下职责：校验选择键、加载并校验 `config.json`、将原始节点解析为结构化字段、创建三份副本、分别修改每份副本的连接地址和名称，以及将三份节点序列化回原协议的有效链接格式。
+`server.js` 只公开 `GET /`、`GET /app.js` 和 `POST /api/generate`；不要扩大静态资源白名单，特别是不得提供 `config.json` 或 `ip.json`。配置由服务端读取，选择器只接受 `HZCT`、`HZCM`。当前实现只支持 VMess Base64 JSON 链接：解析字段 `add` 和 `ps`，复制三份后将其分别设置为配置中的前三个 IP 和精确名称 `-1`、`-2`、`-3`，并重新序列化为 `vmess://` 链接。
 
-实现配置解析前，必须先检查实际存在的 `config.json` 格式，不得臆造其数据结构。实现必须建立确定的映射关系，将 `HZCT` 或 `HZCM` 对应的三个 IP 按固定顺序映射到名称 `-1`、`-2` 和 `-3`。
+`config.json` 的现有结构是以 `HZCT` 与 `HZCM` 为键、按顺序存放 IP 的数组。第 1、2、3 个 IP 分别对应 `-1`、`-2`、`-3`。配置读取、JSON 解析、数组结构、IP 格式或数量校验失败必须显式报错，且不得回退读取 `ip.json`。
+
+若要扩展其他节点协议，为协议分别实现配对的解析器和序列化器。不得对编码后的链接执行字符串替换。
 
 ## 节点转换约束
 
-只替换节点的连接地址。除非某种协议在解析和重新序列化过程中必须进行编码层面的规范化，否则其他节点字段必须保持不变。尤其不得混淆网络连接地址、传输层 Host 和 TLS SNI 字段。
-
-每种协议的解析器和序列化器必须配套使用：先解码原始节点链接，再编辑结构化数据，最后编码为同一协议的有效节点链接。不得对编码后的节点 URL 直接执行盲目的字符串替换。
+只替换 VMess JSON 的连接地址字段 `add` 和节点名称字段 `ps`。除非协议解析和重新序列化本身要求编码规范化，否则端口、UUID/凭据、传输层、路径、Host、TLS SNI 和其余字段必须保持不变。连接地址、传输层 Host 与 TLS SNI 是不同字段，不得混淆。
 
 ## 前端约束
 
-前端必须保持无框架，并能作为纯静态 HTML、CSS 和 JavaScript 使用。添加缺失的 HTML 时，要么提供 `app.js` 引用的全部 DOM 元素 ID，要么在同一次修改中同步更新所有选择器和事件处理代码。后端返回的预览字段在写入 HTML 前必须继续进行转义。
-
-`app.js` 当前依赖全局 `window.QRCode` 实现。只有在修改后的三节点输出界面仍需显示二维码时才保留该功能。
+前端必须保持无框架，并能作为纯静态 HTML、CSS 和 JavaScript 使用。后端返回的结果通过 DOM API 写入页面；不要为结果数据引入未经转义的 `innerHTML`。保留 Clipboard API 的复制功能及其回退路径。
 
 ## 验证要求
 

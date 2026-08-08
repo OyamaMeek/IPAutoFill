@@ -1,0 +1,14 @@
+{
+  "name": "ipautofill",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IP-optimized VMess node generator",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test",
+    "test:file": "node --test"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
