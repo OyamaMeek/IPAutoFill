@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>IPAutoFill · 优选 IP 节点生成</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+      color: #1d1d1f;
+      background: #f5f5f7;
+      font-synthesis: none;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; min-height: 100dvh; background: #f5f5f7; }
+    main { width: min(760px, calc(100% - 40px)); margin: 0 auto; padding: 76px 0 64px; }
+    .hero { margin: 0 0 30px; }
+    .eyebrow { margin: 0 0 9px; color: #6e6e73; font-size: 13px; font-weight: 600; letter-spacing: .01em; }
+    h1 { margin: 0; font-size: clamp(34px, 5vw, 46px); font-weight: 700; letter-spacing: -.045em; line-height: 1.08; }
+    .hero p { max-width: 610px; margin: 14px 0 0; color: #6e6e73; font-size: 17px; line-height: 1.52; }
+    .panel { padding: 28px; border: 1px solid rgb(0 0 0 / 8%); border-radius: 20px; background: #fff; box-shadow: 0 1px 2px rgb(0 0 0 / 4%), 0 8px 24px rgb(0 0 0 / 5%); }
+    .section-heading { margin: 0 0 23px; }
+    .section-heading h2 { margin: 0; font-size: 21px; letter-spacing: -.02em; }
+    .section-heading p, .field-help { margin: 6px 0 0; color: #6e6e73; font-size: 14px; line-height: 1.45; }
+    .field { margin-top: 22px; }
+    label { display: block; margin: 0 0 8px; color: #1d1d1f; font-size: 15px; font-weight: 600; }
+    textarea, select, input { width: 100%; border: 1px solid #c7c7cc; border-radius: 12px; background: #fff; color: #1d1d1f; font: inherit; transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease; }
+    textarea { min-height: 160px; padding: 14px 15px; font-size: 16px; line-height: 1.5; resize: vertical; }
+    select { min-height: 48px; padding: 0 13px; font-size: 16px; }
+    textarea::placeholder { color: #8e8e93; }
+    textarea:focus-visible, select:focus-visible, button:focus-visible { outline: none; border-color: #007aff; box-shadow: 0 0 0 4px rgb(0 122 255 / 20%); }
+    .route-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; }
+    .actions { display: flex; gap: 12px; margin-top: 27px; }
+    button { min-height: 44px; border: 0; border-radius: 12px; padding: 10px 17px; cursor: pointer; background: #e9e9ed; color: #1d1d1f; font: inherit; font-size: 16px; font-weight: 600; transition: transform 140ms ease, background 140ms ease, box-shadow 140ms ease, opacity 140ms ease; }
+    button:hover { background: #dedee3; }
+    button:active { transform: scale(.98); }
+    button.primary { background: #007aff; color: #fff; box-shadow: 0 1px 1px rgb(0 0 0 / 10%); }
+    button.primary:hover { background: #0071e3; }
+    button:disabled { cursor: default; opacity: .52; transform: none; }
+    .secondary { white-space: nowrap; }
+    .hidden { display: none !important; }
+    #warningBox { margin-top: 20px; padding: 13px 14px; border: 1px solid rgb(255 59 48 / 30%); border-radius: 13px; background: #fff2f1; color: #b42318; font-size: 15px; line-height: 1.45; white-space: pre-wrap; }
+    .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 24px; background: rgb(0 0 0 / 36%); backdrop-filter: blur(14px) saturate(125%); animation: fade-in 180ms ease-out; }
+    .modal { width: min(730px, 100%); max-height: min(720px, calc(100dvh - 48px)); overflow: auto; padding: 24px; border: 1px solid rgb(255 255 255 / 72%); border-radius: 22px; background: rgb(255 255 255 / 94%); box-shadow: 0 24px 70px rgb(0 0 0 / 22%); animation: dialog-in 200ms cubic-bezier(.2, .8, .2, 1); }
+    .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+    .modal h2 { margin: 0; font-size: 22px; letter-spacing: -.025em; }
+    .hint { margin: 6px 0 0; color: #6e6e73; font-size: 14px; line-height: 1.45; }
+    .close { display: grid; min-width: 44px; min-height: 44px; place-items: center; padding: 0; border-radius: 50%; color: #3a3a3c; font-size: 25px; font-weight: 400; line-height: 1; }
+    #nodeResults { display: grid; gap: 12px; }
+    .node-card { padding: 16px; border: 1px solid rgb(0 0 0 / 9%); border-radius: 16px; background: #fff; }
+    .node-card header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    .node-name { color: #1d1d1f; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+    .server { color: #6e6e73; font: 13px ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .node-card textarea { min-height: 72px; padding: 11px 12px; border-radius: 10px; background: #f5f5f7; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+    .copy { width: 100%; margin-top: 10px; background: #f2f2f7; color: #007aff; }
+    .copy:hover { background: #e8f2ff; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid rgb(0 0 0 / 8%); }
+    .status-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes dialog-in { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+    @media (max-width: 620px) {
+      main { width: min(100% - 32px, 760px); padding: max(36px, env(safe-area-inset-top)) 0 calc(32px + env(safe-area-inset-bottom)); }
+      .hero { margin-bottom: 24px; }
+      h1 { font-size: 36px; }
+      .hero p { font-size: 16px; }
+      .panel { padding: 20px; border-radius: 18px; }
+      .route-row { grid-template-columns: 1fr; }
+      .secondary, .actions .primary { width: 100%; }
+      .modal-backdrop { place-items: end center; padding: 0; }
+      .modal { width: 100%; max-height: 86dvh; padding: 20px 16px calc(20px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; }
+      .modal-actions { display: grid; grid-template-columns: 1fr; }
+      .modal-actions button { width: 100%; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <main id="pageContent">
+    <header class="hero">
+      <p class="eyebrow">本地处理 · 无需联网</p>
+      <h1>优选 IP 自动填充</h1>
+      <p>粘贴一条 VMess 节点，选择线路后在本地生成三个仅替换连接地址的节点副本。</p>
+    </header>
+
+    <section class="panel" aria-labelledby="form-title">
+      <div class="section-heading">
+        <h2 id="form-title">生成节点</h2>
+        <p>节点凭据、端口和传输参数会保持原样。</p>
+      </div>
+      <form id="generator-form">
+        <div class="field">
+          <label for="nodeLink">1 · 原始 VMess 节点</label>
+          <textarea id="nodeLink" name="nodeLink" spellcheck="false" placeholder="vmess://..." aria-describedby="nodeHelp" required></textarea>
+          <p id="nodeHelp" class="field-help">支持 VMess Base64 JSON 与 VMess URI 格式。</p>
+        </div>
+        <div class="field route-row">
+          <div>
+            <label for="profile">2 · 选择线路</label>
+            <select id="profile" name="profile">
+              <option value="HZCT">HZCT</option>
+              <option value="HZCM">HZCM</option>
+            </select>
+          </div>
+          <button type="button" id="fillDemoBtn" class="secondary">填入示例节点</button>
+        </div>
+        <div class="actions">
+          <button class="primary" id="submitBtn" type="submit">生成三个节点</button>
+        </div>
+      </form>
+      <div id="warningBox" class="hidden" role="alert" tabindex="-1"></div>
+    </section>
+  </main>
+
+  <div id="resultModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <section class="modal" tabindex="-1">
+      <header class="modal-header">
+        <div>
+          <h2 id="resultTitle">转换完成</h2>
+          <p class="hint">已生成三个节点。节点之间将以换行分隔复制。</p>
+        </div>
+        <button id="closeModalBtn" class="close" type="button" aria-label="关闭结果窗口">×</button>
+      </header>
+      <div id="nodeResults"></div>
+      <div class="modal-actions">
+        <button id="copyAllBtn" class="primary" type="button">复制全部节点</button>
+        <button id="closeModalFooterBtn" type="button">关闭</button>
+      </div>
+    </section>
+  </div>
+  <div id="statusLive" class="status-live" aria-live="polite"></div>
+  <script src="frontend.js"></script>
+</body>
+</html>

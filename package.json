@@ -2,6 +2,7 @@
   "name": "ipautofill",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "description": "IP-optimized VMess node generator",
   "scripts": {
     "start": "node server.js",
