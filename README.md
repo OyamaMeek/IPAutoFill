@@ -15,7 +15,7 @@
 ├── frontend.js           # 浏览器端本地转换逻辑（含内置线路 IP）
 ├── app.js                # 旧版前端（调用后端接口，已不再引用）
 ├── server.js             # 可选：Node 标准库 HTTP 服务（读取 config.json）
-├── config.json           # 服务端线路 IP 配置（仅 server.js 使用）
+├── config.json           # 线路 IP 配置：server.js 与静态版前端都会读取
 ├── ip.json               # 旧配置文件（当前业务不读取）
 ├── package.json          # 零依赖项目脚本
 ├── test/
@@ -149,8 +149,9 @@ wrangler pages deploy pubilc --project-name ipautofill
 
 ## 说明与注意事项
 
-- 纯静态版本内置了 `HZCT` / `HZCM` 的 IP 表（见 `frontend.js` 中 `PROFILE_IPS`），这些 IP 会随页面公开展示。若需要保密线路 IP，应使用 `server.js` 的服务端模式，并自行调整部署方式（如 Cloudflare Pages Functions）。
-- 当前 `config.json` 的 `HZCT` 第 2、3 个 IP 与 `frontend.js` 内置的 `PROFILE_IPS` 存在差异：前者用于 `server.js` 服务端模式，后者用于纯静态模式。修改时请同时更新两处，保持线路一致。
+- 纯静态版（含 Cloudflare Pages 部署）每次生成前都会动态读取同目录 `config.json` 中 `HZCT` / `HZCM` 的最新 IP；读取失败或字段无效时才回退到 `frontend.js` 中内置的 `PROFILE_IPS` 默认值。修改线路 IP 后，需同步更新部署目录中的 `config.json` 并重新部署。
+- 由于 `config.json` 会随静态页面公开，其中 IP 对访问者可见。若需要保密线路 IP，应使用 `server.js` 的服务端模式，并自行调整部署方式（如 Cloudflare Pages Functions）。
+- 使用本地 `file://` 直接打开 `index.html` 时，浏览器会阻止读取 `config.json`，此时会自动回退到内置默认 IP。如需验证动态读取，请通过 HTTP 访问（`npm start` 或部署后的域名）。
 - `CLAUDE.md` 中记录的架构目标是「配置加载与节点转换由后端负责、不向浏览器暴露 `config.json`」；当前仓库同时提供了「纯静态本地转换」与「服务端转换」两条路径，README 仅描述实际运行方式。
 
 ## 开源协议

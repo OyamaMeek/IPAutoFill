@@ -40,14 +40,21 @@
     event.preventDefault();
     setError('');
     setSubmitting(true);
-    try {
-      lastNodes = generateNodesLocally(trim(nodeInput.value), profileInput.value);
-      renderNodes(lastNodes);
-      openModal();
-    } catch (error) {
-      setError(error && error.message ? error.message : '节点转换失败。');
-    }
-    setSubmitting(false);
+    loadProfileIps(profileInput.value, function (ips, ipSource) {
+      setSubmitting(false);
+      if (!ips) {
+        setError('未能读取 config.json，且内置线路不可用。');
+        return;
+      }
+      try {
+        lastNodes = generateNodesLocally(trim(nodeInput.value), ips);
+        renderNodes(lastNodes);
+        openModal();
+        if (ipSource === 'fallback') announce('config.json 不可用，已使用内置线路 IP。');
+      } catch (error) {
+        setError(error && error.message ? error.message : '节点转换失败。');
+      }
+    });
   });
 
   closeButton.addEventListener('click', closeModal);
@@ -69,14 +76,13 @@
     copyText(links.join('\n'), copyAllButton, '复制全部节点', '全部节点');
   });
 
-  function generateNodesLocally(nodeLink, profile) {
+  function generateNodesLocally(nodeLink, ips) {
     var source = parseVmessLink(nodeLink);
-    var ips = PROFILE_IPS[profile];
     var nodes = [];
     var index;
     var originalName = getSourceName(source);
     var baseName = stripTrailingNodeNumber(originalName);
-    if (!ips || ips.length !== 3) throw new Error('只支持 HZCT 或 HZCM 选项。');
+    if (!ips || ips.length !== 3) throw new Error('线路 IP 数量不足三个。');
 
     for (index = 0; index < 3; index += 1) {
       var name = baseName + '-' + (index + 1);
@@ -92,6 +98,74 @@
       nodes.push({ name: name, server: ips[index], link: link });
     }
     return nodes;
+  }
+
+  function loadProfileIps(profile, done) {
+    readJson(profileConfigUrl(), function (error, data) {
+      if (!error && isProfileConfig(data)) {
+        deliverProfile(data, profile, done);
+        return;
+      }
+      deliverProfile(null, profile, done);
+    });
+  }
+
+  function deliverProfile(config, profile, done) {
+    var ips;
+    var source;
+    if (config && Object.prototype.hasOwnProperty.call(config, profile)) {
+      ips = config[profile];
+      if (isIpList(ips)) {
+        done(ips, 'config');
+        return;
+      }
+    }
+    source = PROFILE_IPS[profile];
+    done(isIpList(source) ? source : null, 'fallback');
+  }
+
+  function profileConfigUrl() {
+    var base = window.location.href;
+    var cut = base.indexOf('#');
+    if (cut !== -1) base = base.slice(0, cut);
+    if (base.slice(-1) === '/') base = base.slice(0, -1);
+    return base + '/config.json';
+  }
+
+  function readJson(url, done) {
+    var request = new XMLHttpRequest();
+    request.open('GET', url, true);
+    request.onreadystatechange = function () {
+      var data;
+      if (request.readyState !== 4) return;
+      if (request.status < 200 || request.status >= 300) {
+        done(new Error('config.json 请求失败'));
+        return;
+      }
+      try {
+        data = JSON.parse(request.responseText);
+      } catch (ignored) {
+        done(new Error('config.json 不是有效 JSON'));
+        return;
+      }
+      done(null, data);
+    };
+    request.onerror = function () { done(new Error('config.json 请求失败')); };
+    try {
+      request.send();
+    } catch (ignored) {
+      done(new Error('config.json 请求失败'));
+    }
+  }
+
+  function isProfileConfig(data) {
+    return data && Object.prototype.toString.call(data) === '[object Object]' &&
+      (isIpList(data.HZCT) || isIpList(data.HZCM));
+  }
+
+  function isIpList(list) {
+    return Object.prototype.toString.call(list) === '[object Array]' && list.length === 3 &&
+      list.every(function (ip) { return typeof ip === 'string' && trim(ip); });
   }
 
   function parseVmessLink(nodeLink) {
