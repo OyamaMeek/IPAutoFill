@@ -61,10 +61,12 @@
     var ips = PROFILE_IPS[profile];
     var nodes = [];
     var index;
+    var originalName = getSourceName(source);
+    var baseName = stripTrailingNodeNumber(originalName);
     if (!ips || ips.length !== 3) throw new Error('只支持 HZCT 或 HZCM 选项。');
 
     for (index = 0; index < 3; index += 1) {
-      var name = '-' + (index + 1);
+      var name = baseName + '-' + (index + 1);
       var link;
       if (source.format === 'json') {
         var clone = cloneObject(source.node);
@@ -120,7 +122,8 @@
       format: 'uri',
       user: authority.slice(0, atIndex),
       port: endpoint.port,
-      rawQuery: rawQuery
+      rawQuery: rawQuery,
+      name: readRemarks(rawQuery)
     };
   }
 
@@ -166,14 +169,42 @@
       }
       if (decodedKey === 'remarks') {
         remarksCount += 1;
-        rewritten.push(rawKey + '=' + name);
+        rewritten.push(rawKey + '=' + encodeURIComponent(name));
       } else {
         rewritten.push(part);
       }
     }
     if (remarksCount > 1) throw new Error('VMess URI 包含多个 remarks 参数，无法确定节点名称。');
-    if (remarksCount === 0) rewritten.push('remarks=' + name);
+    if (remarksCount === 0) rewritten.push('remarks=' + encodeURIComponent(name));
     return { query: rewritten.join('&'), remarksCount: remarksCount };
+  }
+
+  function getSourceName(source) {
+    return source.format === 'json' ? source.node.ps : source.name;
+  }
+
+  function stripTrailingNodeNumber(name) {
+    return String(name || '').replace(/-\d+$/, '');
+  }
+
+  function readRemarks(rawQuery) {
+    var parts = rawQuery.split('&');
+    var name = '';
+    var count = 0;
+    var index;
+    for (index = 0; index < parts.length; index += 1) {
+      var equalIndex = parts[index].indexOf('=');
+      var rawKey = equalIndex === -1 ? parts[index] : parts[index].slice(0, equalIndex);
+      var rawValue = equalIndex === -1 ? '' : parts[index].slice(equalIndex + 1);
+      var decodedKey;
+      try { decodedKey = decodeURIComponent(rawKey); } catch (ignored) { decodedKey = rawKey; }
+      if (decodedKey === 'remarks') {
+        count += 1;
+        try { name = decodeURIComponent(rawValue); } catch (ignoredValue) { throw new Error('VMess URI 的 remarks 参数编码无效。'); }
+      }
+    }
+    if (count > 1) throw new Error('VMess URI 包含多个 remarks 参数，无法确定节点名称。');
+    return name;
   }
 
   function decodeBase64Utf8(value) {
