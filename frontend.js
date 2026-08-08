@@ -17,14 +17,23 @@
   var closeButton = document.getElementById('closeModalBtn');
   var closeFooterButton = document.getElementById('closeModalFooterBtn');
   var copyAllButton = document.getElementById('copyAllBtn');
+  var statusLive = document.getElementById('statusLive');
+  var pageContent = document.getElementById('pageContent');
+  var lastFocusedElement = null;
   var lastNodes = [];
   var exampleLink = 'vmess://ewogICJ2IjogIjIiLAogICJwcyI6ICJkZW1vLXdzLXRscyIsCiAgImFkZCI6ICJlZGdlLmV4YW1wbGUuY29tIiwKICAicG9ydCI6ICI0NDMiLAogICJpZCI6ICIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEiLAogICJzY3kiOiAiYXV0byIsCiAgIm5ldCI6ICJ3cyIsCiAgInRscyI6ICJ0bHMiLAogICJwYXRoIjogIi93cyIsCiAgImhvc3QiOiAiZWRnZS5leGFtcGxlLmNvbSIsCiAgInNuaSI6ICJlZGdlLmV4YW1wbGUuY29tIiwKICAiZnAiOiAiY2hyb21lIiwKICAiYWxwbiI6ICJoMixodHRwLzEuMSIKfQ==';
 
-  if (!form || !nodeInput || !profileInput || !submitButton || !demoButton || !errorBox || !modal || !resultList || !closeButton || !closeFooterButton || !copyAllButton) return;
+  if (!form || !nodeInput || !profileInput || !submitButton || !demoButton || !errorBox || !modal || !resultList || !closeButton || !closeFooterButton || !copyAllButton || !statusLive || !pageContent) return;
 
   demoButton.addEventListener('click', function () {
     nodeInput.value = exampleLink;
     nodeInput.focus();
+    setError('');
+    announce('已填入示例节点。');
+  });
+
+  nodeInput.addEventListener('input', function () {
+    if (nodeInput.getAttribute('aria-invalid') === 'true') setError('');
   });
 
   form.addEventListener('submit', function (event) {
@@ -47,13 +56,17 @@
     if (event.target === modal) closeModal();
   });
   document.addEventListener('keydown', function (event) {
-    if (event.key === 'Escape' || event.keyCode === 27) closeModal();
+    if (!modal.classList.contains('hidden') && (event.key === 'Escape' || event.keyCode === 27)) {
+      closeModal();
+      return;
+    }
+    if (!modal.classList.contains('hidden') && (event.key === 'Tab' || event.keyCode === 9)) trapModalFocus(event);
   });
   copyAllButton.addEventListener('click', function () {
     var links = [];
     var index;
     for (index = 0; index < lastNodes.length; index += 1) links.push(lastNodes[index].link);
-    copyText(links.join('\n'), copyAllButton, '复制全部节点');
+    copyText(links.join('\n'), copyAllButton, '复制全部节点', '全部节点');
   });
 
   function generateNodesLocally(nodeLink, profile) {
@@ -267,26 +280,26 @@
     copyButton.className = 'copy';
     copyButton.type = 'button';
     copyButton.textContent = '复制节点';
-    copyButton.addEventListener('click', function () { copyText(link.value, copyButton, '复制节点'); });
+    copyButton.addEventListener('click', function () { copyText(link.value, copyButton, '复制节点', '节点 ' + node.name); });
     card.appendChild(header);
     card.appendChild(link);
     card.appendChild(copyButton);
     return card;
   }
 
-  function copyText(text, button, originalLabel) {
+  function copyText(text, button, originalLabel, itemLabel) {
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function () {
-        showCopyState(button, originalLabel, true);
+        showCopyState(button, originalLabel, true, itemLabel);
       }, function () {
-        fallbackCopy(text, button, originalLabel);
+        fallbackCopy(text, button, originalLabel, itemLabel);
       });
       return;
     }
-    fallbackCopy(text, button, originalLabel);
+    fallbackCopy(text, button, originalLabel, itemLabel);
   }
 
-  function fallbackCopy(text, button, originalLabel) {
+  function fallbackCopy(text, button, originalLabel, itemLabel) {
     var temporary = document.createElement('textarea');
     var copied = false;
     temporary.value = text;
@@ -301,17 +314,58 @@
       copied = false;
     }
     document.body.removeChild(temporary);
-    showCopyState(button, originalLabel, copied);
+    showCopyState(button, originalLabel, copied, itemLabel);
   }
 
-  function showCopyState(button, originalLabel, copied) {
+  function showCopyState(button, originalLabel, copied, itemLabel) {
     button.textContent = copied ? '已复制' : '请手动复制';
+    announce(copied ? itemLabel + '已复制到剪贴板。' : itemLabel + '复制失败，请手动选择链接复制。');
     window.setTimeout(function () { button.textContent = originalLabel; }, 1200);
   }
 
-  function openModal() { modal.classList.remove('hidden'); closeButton.focus(); }
-  function closeModal() { modal.classList.add('hidden'); }
+  function openModal() {
+    lastFocusedElement = document.activeElement;
+    modal.classList.remove('hidden');
+    pageContent.setAttribute('aria-hidden', 'true');
+    closeButton.focus();
+    announce('已生成三个节点，结果窗口已打开。');
+  }
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    pageContent.removeAttribute('aria-hidden');
+    if (lastFocusedElement && lastFocusedElement.focus) lastFocusedElement.focus();
+  }
+
+  function trapModalFocus(event) {
+    var focusable = modal.querySelectorAll('button:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])');
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (!focusable.length) return;
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function setSubmitting(value) { submitButton.disabled = value; submitButton.textContent = value ? '转换中…' : '生成三个节点'; }
-  function setError(message) { errorBox.textContent = message; if (message) errorBox.classList.remove('hidden'); else errorBox.classList.add('hidden'); }
+
+  function setError(message) {
+    errorBox.textContent = message;
+    if (message) {
+      errorBox.classList.remove('hidden');
+      nodeInput.setAttribute('aria-invalid', 'true');
+      errorBox.focus();
+    } else {
+      errorBox.classList.add('hidden');
+      nodeInput.removeAttribute('aria-invalid');
+    }
+  }
+
+  function announce(message) { statusLive.textContent = ''; window.setTimeout(function () { statusLive.textContent = message; }, 20); }
+
   function trim(value) { return String(value).replace(/^\s+|\s+$/g, ''); }
 }());
