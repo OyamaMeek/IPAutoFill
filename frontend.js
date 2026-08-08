@@ -64,28 +64,116 @@
     if (!ips || ips.length !== 3) throw new Error('只支持 HZCT 或 HZCM 选项。');
 
     for (index = 0; index < 3; index += 1) {
-      var clone = cloneObject(source);
-      clone.add = ips[index];
-      clone.ps = '-' + (index + 1);
-      nodes.push({ name: clone.ps, server: clone.add, link: 'vmess://' + encodeBase64Utf8(JSON.stringify(clone)) });
+      var name = '-' + (index + 1);
+      var link;
+      if (source.format === 'json') {
+        var clone = cloneObject(source.node);
+        clone.add = ips[index];
+        clone.ps = name;
+        link = 'vmess://' + encodeBase64Utf8(JSON.stringify(clone));
+      } else {
+        link = serializeUriNode(source, ips[index], name);
+      }
+      nodes.push({ name: name, server: ips[index], link: link });
     }
     return nodes;
   }
 
   function parseVmessLink(nodeLink) {
     var prefix = 'vmess://';
-    var node;
+    var content;
+    var queryIndex;
+    var jsonNode;
     if (!nodeLink) throw new Error('请填写一条原始 VMess 节点链接。');
-    if (nodeLink.slice(0, prefix.length).toLowerCase() !== prefix) throw new Error('当前仅支持 vmess:// Base64 JSON 格式的节点链接。');
-    try {
-      node = JSON.parse(decodeBase64Utf8(nodeLink.slice(prefix.length)));
-    } catch (ignored) {
-      throw new Error('原始节点不是有效的 VMess Base64 JSON 链接。');
+    if (nodeLink.slice(0, prefix.length).toLowerCase() !== prefix) throw new Error('当前仅支持 vmess:// 节点链接。');
+    content = nodeLink.slice(prefix.length);
+    queryIndex = content.indexOf('?');
+
+    if (queryIndex === -1) {
+      try {
+        jsonNode = JSON.parse(decodeBase64Utf8(content));
+      } catch (ignored) {
+        throw new Error('原始节点不是有效的 VMess Base64 JSON 或 URI 链接。');
+      }
+      if (!jsonNode || Object.prototype.toString.call(jsonNode) !== '[object Object]') throw new Error('VMess 节点内容必须是 JSON 对象。');
+      if (typeof jsonNode.add !== 'string' || !trim(jsonNode.add)) throw new Error('VMess 节点缺少有效的连接地址字段 add。');
+      if (typeof jsonNode.ps !== 'string') throw new Error('VMess 节点缺少有效的名称字段 ps。');
+      return { format: 'json', node: jsonNode };
     }
-    if (!node || Object.prototype.toString.call(node) !== '[object Object]') throw new Error('VMess 节点内容必须是 JSON 对象。');
-    if (typeof node.add !== 'string' || !trim(node.add)) throw new Error('VMess 节点缺少有效的连接地址字段 add。');
-    if (typeof node.ps !== 'string') throw new Error('VMess 节点缺少有效的名称字段 ps。');
-    return node;
+
+    return parseUriNode(content.slice(0, queryIndex), content.slice(queryIndex + 1));
+  }
+
+  function parseUriNode(encodedAuthority, rawQuery) {
+    var authority;
+    var atIndex;
+    var endpoint;
+    try {
+      authority = decodeBase64Utf8(encodedAuthority);
+    } catch (ignored) {
+      throw new Error('VMess URI 的连接信息不是有效 Base64。');
+    }
+    atIndex = authority.lastIndexOf('@');
+    if (atIndex <= 0 || atIndex === authority.length - 1) throw new Error('VMess URI 缺少有效的用户或连接地址。');
+    endpoint = parseEndpoint(authority.slice(atIndex + 1));
+    return {
+      format: 'uri',
+      user: authority.slice(0, atIndex),
+      port: endpoint.port,
+      rawQuery: rawQuery
+    };
+  }
+
+  function parseEndpoint(endpoint) {
+    var separator;
+    var closeBracket;
+    var host;
+    var port;
+    if (endpoint.charAt(0) === '[') {
+      closeBracket = endpoint.indexOf(']');
+      if (closeBracket <= 1 || endpoint.charAt(closeBracket + 1) !== ':') throw new Error('VMess URI 的 IPv6 地址或端口格式无效。');
+      host = endpoint.slice(1, closeBracket);
+      port = endpoint.slice(closeBracket + 2);
+    } else {
+      separator = endpoint.lastIndexOf(':');
+      if (separator <= 0 || separator === endpoint.length - 1 || endpoint.slice(0, separator).indexOf(':') !== -1) throw new Error('VMess URI 的连接地址或端口格式无效。');
+      host = endpoint.slice(0, separator);
+      port = endpoint.slice(separator + 1);
+    }
+    if (!trim(host) || !/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) throw new Error('VMess URI 的连接地址或端口格式无效。');
+    return { host: host, port: port };
+  }
+
+  function serializeUriNode(source, ip, name) {
+    var authority = source.user + '@' + (ip.indexOf(':') === -1 ? ip : '[' + ip + ']') + ':' + source.port;
+    return 'vmess://' + encodeBase64Utf8(authority) + '?' + rewriteRemarks(source.rawQuery, name).query;
+  }
+
+  function rewriteRemarks(rawQuery, name) {
+    var parts = rawQuery.split('&');
+    var rewritten = [];
+    var remarksCount = 0;
+    var index;
+    for (index = 0; index < parts.length; index += 1) {
+      var part = parts[index];
+      var equalIndex = part.indexOf('=');
+      var rawKey = equalIndex === -1 ? part : part.slice(0, equalIndex);
+      var decodedKey;
+      try {
+        decodedKey = decodeURIComponent(rawKey);
+      } catch (ignored) {
+        decodedKey = rawKey;
+      }
+      if (decodedKey === 'remarks') {
+        remarksCount += 1;
+        rewritten.push(rawKey + '=' + name);
+      } else {
+        rewritten.push(part);
+      }
+    }
+    if (remarksCount > 1) throw new Error('VMess URI 包含多个 remarks 参数，无法确定节点名称。');
+    if (remarksCount === 0) rewritten.push('remarks=' + name);
+    return { query: rewritten.join('&'), remarksCount: remarksCount };
   }
 
   function decodeBase64Utf8(value) {
