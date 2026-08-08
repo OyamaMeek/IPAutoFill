@@ -95,6 +95,7 @@ function sendJson(response, statusCode, body) {
   response.writeHead(statusCode, {
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
+    'access-control-allow-origin': '*',
   });
   response.end(JSON.stringify(body));
 }
@@ -138,6 +139,15 @@ function readJsonBody(request) {
 function createServer(options = {}) {
   return http.createServer(async (request, response) => {
     try {
+      if (request.method === 'OPTIONS' && request.url === '/api/generate') {
+        response.writeHead(204, {
+          'access-control-allow-origin': '*',
+          'access-control-allow-methods': 'POST, OPTIONS',
+          'access-control-allow-headers': 'content-type',
+        });
+        response.end();
+        return;
+      }
       if (request.method === 'GET' && request.url === '/') {
         sendFile(response, 'index.html', 'text/html; charset=utf-8');
         return;
