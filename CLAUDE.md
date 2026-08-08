@@ -1,37 +1,37 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+本文件为 Claude Code（claude.ai/code）在本代码仓库中工作时提供指导。
+每次回答前请先称呼我为妹妹
+## 产品目标
 
-## Product goal
+IPAutoFill 是一个优选 IP 代理节点生成工具，前端使用纯静态 HTML、CSS 和 JavaScript。要求实现以下用户流程：
 
-IPAutoFill is an IP-optimized proxy-node generator with a plain static HTML/CSS/JavaScript frontend. The required user flow is:
+1. 用户粘贴一个原始代理节点。
+2. 用户选择 `HZCT` 或 `HZCM`。
+3. 后端从本地 `config.json` 中读取该选项对应的 IP。
+4. 后端复制原始节点三份，仅将每份节点的连接地址替换为对应的配置 IP。
+5. 将三个节点的名称分别精确设置为 `-1`、`-2` 和 `-3`，然后返回三个完整节点链接，供用户直接复制。
 
-1. Paste one original proxy node.
-2. Select `HZCT` or `HZCM`.
-3. The backend reads the IP values for that selection from local `config.json`.
-4. The backend creates three copies of the node, replacing only each copy's connection address with the corresponding configured IP.
-5. Set the three node names to exactly `-1`, `-2`, and `-3` and return the three complete node links for direct copying.
+前端虽然是静态页面，但配置加载和节点转换属于后端职责。不得将 `config.json` 作为浏览器可访问的静态资源暴露。
 
-The frontend is static, but configuration loading and node conversion are backend responsibilities. Do not expose `config.json` as a browser asset.
+## 当前仓库状态
 
-## Current repository state
+仓库目前尚不完整，现有文件包括：
 
-The repository is incomplete. It currently contains:
+- `app.js`：处理浏览器端表单、发送 `POST /api/generate` 请求、渲染结果以及实现复制和二维码操作。
+- `ip.json`：
 
-- `app.js`: browser-side form handling, a `POST /api/generate` request, result rendering, copy controls, and QR-code controls.
-- `ip.json`: an empty placeholder.
+当前没有 HTML 入口页、后端实现、`config.json`、`package.json`、README、测试套件、代码检查配置或依赖锁文件。需求指定的配置来源是 `config.json`，不得擅自使用空的 `ip.json` 代替。
 
-There is currently no HTML entry page, backend implementation, `config.json`, `package.json`, README, test suite, linter configuration, or dependency lockfile. The requested configuration source is `config.json`; do not silently use the empty `ip.json` in its place.
+## 命令
 
-## Commands
+当前没有定义构建、代码检查、测试、单文件测试或应用启动命令。不得假设存在 npm 命令。添加项目工具后，应根据实际的 `package.json` 或其他配置在此记录对应命令，其中必须包括运行单个测试文件的命令。
 
-No build, lint, test, single-test, or application-start command is currently defined. Do not assume npm commands. When tooling is added, document commands here from the actual project configuration, including the command for running one test file.
+## 架构与迁移目标
 
-## Architecture and migration target
+`app.js` 只是现有的浏览器端控制器，不负责解析或修改节点。它目前依赖固定的 DOM 元素 ID，向 `/api/generate` 提交请求，渲染订阅地址和预览表格，通过 `escapeHtml()` 转义预览数据，并提供复制和二维码交互。
 
-`app.js` is only the existing browser controller; it does not parse or modify nodes. It currently expects fixed DOM element IDs, submits to `/api/generate`, renders subscription URLs and a preview table, escapes preview values with `escapeHtml()`, and provides copy and QR-code interactions.
-
-Its current request body is:
+当前请求体为：
 
 ```json
 {
@@ -42,24 +42,24 @@ Its current request body is:
 }
 ```
 
-This is a legacy contract that does not match the required product flow. Replace the free-form preferred-IP and name-prefix inputs with an `HZCT`/`HZCM` selector. Change the request to send the original node and selected key. Update the static HTML, `app.js`, and `/api/generate` response contract together so the result is three directly copyable node links rather than the current auto/raw/Clash/Surge subscription URL set.
+这是不符合目标产品流程的旧接口。应将自由填写的优选 IP 和名称前缀输入框替换为 `HZCT`/`HZCM` 选择器，并将请求改为发送一个原始节点和所选配置键。静态 HTML、`app.js` 和 `/api/generate` 的响应协议必须同步更新，使最终结果成为三个可直接复制的节点链接，而不是当前的 auto、raw、Clash 和 Surge 订阅地址集合。
 
-The backend should keep these responsibilities separate: validate the selected key, load and validate `config.json`, parse the source node into structured fields, create three copies, change the connection address and name in each copy, and serialize all three back to the source protocol's link format.
+后端应分离以下职责：校验选择键、加载并校验 `config.json`、将原始节点解析为结构化字段、创建三份副本、分别修改每份副本的连接地址和名称，以及将三份节点序列化回原协议的有效链接格式。
 
-Before implementing configuration parsing, inspect the real `config.json` format once that file exists. Do not invent its schema. The implementation must establish a deterministic mapping from the three IP values selected for `HZCT` or `HZCM` to names `-1`, `-2`, and `-3`.
+实现配置解析前，必须先检查实际存在的 `config.json` 格式，不得臆造其数据结构。实现必须建立确定的映射关系，将 `HZCT` 或 `HZCM` 对应的三个 IP 按固定顺序映射到名称 `-1`、`-2` 和 `-3`。
 
-## Node conversion constraints
+## 节点转换约束
 
-The connection address is the field to replace. Other node fields must remain unchanged unless a protocol requires an encoding-only normalization during parse/serialize. In particular, do not confuse the network connection address with transport Host or TLS SNI fields.
+只替换节点的连接地址。除非某种协议在解析和重新序列化过程中必须进行编码层面的规范化，否则其他节点字段必须保持不变。尤其不得混淆网络连接地址、传输层 Host 和 TLS SNI 字段。
 
-Protocol-specific parsing and serialization must be paired: decode the original link, edit structured data, then encode a valid link of the same protocol. Do not perform blind string replacement on an encoded node URL.
+每种协议的解析器和序列化器必须配套使用：先解码原始节点链接，再编辑结构化数据，最后编码为同一协议的有效节点链接。不得对编码后的节点 URL 直接执行盲目的字符串替换。
 
-## Frontend constraints
+## 前端约束
 
-Keep the frontend framework-free and usable as plain static HTML/CSS/JavaScript. If the missing HTML is added, either provide every DOM ID referenced by `app.js` or update the selectors and event handlers in the same change. Preserve HTML escaping for backend-derived preview values.
+前端必须保持无框架，并能作为纯静态 HTML、CSS 和 JavaScript 使用。添加缺失的 HTML 时，要么提供 `app.js` 引用的全部 DOM 元素 ID，要么在同一次修改中同步更新所有选择器和事件处理代码。后端返回的预览字段在写入 HTML 前必须继续进行转义。
 
-`app.js` currently expects a global `window.QRCode` implementation. Retain it only if QR display remains part of the revised three-node output interface.
+`app.js` 当前依赖全局 `window.QRCode` 实现。只有在修改后的三节点输出界面仍需显示二维码时才保留该功能。
 
-## Verification
+## 验证要求
 
-After implementation, verify decoded output fields. One valid source node and either selector must produce exactly three valid links; their names must be exactly `-1`, `-2`, and `-3`; their connection addresses must match the three backend-selected IP values in deterministic order; and all unrelated node fields must match the source. Also verify explicit failures for malformed nodes, an unsupported selector, missing or invalid `config.json`, and insufficient valid IP values.
+完成实现后，应通过解码后的字段验证转换结果。一个有效原始节点配合任一选择器必须生成且仅生成三个有效链接；名称必须分别精确等于 `-1`、`-2` 和 `-3`；连接地址必须按照确定顺序匹配后端选出的三个 IP；所有无关字段必须与原始节点保持一致。同时应验证以下情况会返回明确错误：节点格式错误、选择器不受支持、`config.json` 缺失或格式无效，以及有效 IP 数量不足三个。
