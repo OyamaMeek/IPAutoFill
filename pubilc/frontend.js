@@ -2,7 +2,7 @@
   'use strict';
 
   var PROFILE_IPS = {
-    HZCT: ['172.64.147.132', '172.64.52.79', '162.159.45.77'],
+    HZCT: ['172.64.147.132', '172.64.144.253', '104.18.33.123'],
     HZCM: ['5.6.7.8', '5.6.7.9', '5.6.7.10']
   };
 
@@ -236,7 +236,7 @@
 
   function serializeUriNode(source, ip, name) {
     var authority = source.user + '@' + (ip.indexOf(':') === -1 ? ip : '[' + ip + ']') + ':' + source.port;
-    return 'vmess://' + encodeBase64Utf8(authority) + '?' + rewriteRemarks(source.rawQuery, name).query;
+    return 'vmess://' + encodeBase64RawUtf8(authority) + '?' + rewriteRemarks(source.rawQuery, name).query;
   }
 
   function rewriteRemarks(rawQuery, name) {
@@ -309,6 +309,10 @@
 
   function encodeBase64Utf8(value) {
     return window.btoa(encodeUtf8(value));
+  }
+
+  function encodeBase64RawUtf8(value) {
+    return encodeBase64Utf8(value).replace(/=+$/, '');
   }
 
   function decodeUtf8(binary) {
